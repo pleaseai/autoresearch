@@ -15,7 +15,6 @@ fi
 
 FLAG_FILE="$CLAUDE_PROJECT_DIR/.autoresearch-active"
 COOLDOWN_FILE="$CLAUDE_PROJECT_DIR/.autoresearch-last-spawn"
-COOLDOWN_SECONDS=30  # minimum seconds between agent re-spawns
 
 # If no active flag, allow stop
 if [ ! -f "$FLAG_FILE" ]; then
@@ -28,16 +27,16 @@ if [ ! -f "$CLAUDE_PROJECT_DIR/autoresearch.md" ]; then
   exit 0
 fi
 
-# Check max iterations
-MAX_ITERATIONS=$(head -1 "$FLAG_FILE" 2>/dev/null || echo "0")
-if [ -z "$MAX_ITERATIONS" ]; then
-  MAX_ITERATIONS=0
-fi
+# Parse flag file: line 1 = max iterations, line 2 = cooldown seconds (optional)
+MAX_ITERATIONS=$(sed -n '1p' "$FLAG_FILE" 2>/dev/null || echo "0")
+COOLDOWN_SECONDS=$(sed -n '2p' "$FLAG_FILE" 2>/dev/null || echo "30")
+[ -z "$MAX_ITERATIONS" ] && MAX_ITERATIONS=0
+[ -z "$COOLDOWN_SECONDS" ] && COOLDOWN_SECONDS=30
 
-# Count current iterations from JSONL
+# Count current iterations from JSONL (exclude config lines)
 CURRENT=0
 if [ -f "$CLAUDE_PROJECT_DIR/autoresearch.jsonl" ]; then
-  CURRENT=$(wc -l < "$CLAUDE_PROJECT_DIR/autoresearch.jsonl" | tr -d ' ')
+  CURRENT=$(grep -c '"run":' "$CLAUDE_PROJECT_DIR/autoresearch.jsonl" 2>/dev/null || echo "0")
 fi
 
 # If max iterations reached, allow stop and clean up
@@ -52,7 +51,6 @@ if [ -f "$COOLDOWN_FILE" ]; then
   LAST_SPAWN=$(cat "$COOLDOWN_FILE" 2>/dev/null || echo "0")
   ELAPSED=$((NOW - LAST_SPAWN))
   if [ "$ELAPSED" -lt "$COOLDOWN_SECONDS" ]; then
-    REMAINING=$((COOLDOWN_SECONDS - ELAPSED))
     # Allow stop during cooldown — user can /autoresearch:run to resume
     exit 0
   fi
@@ -61,10 +59,14 @@ fi
 # Record spawn time for cooldown tracking
 echo "$NOW" > "$COOLDOWN_FILE"
 
+# Build display for max iterations
+MAX_DISPLAY="unlimited"
+[ "$MAX_ITERATIONS" -gt 0 ] 2>/dev/null && MAX_DISPLAY="$MAX_ITERATIONS"
+
 # Block stop and instruct to spawn a fresh experiment-runner agent
 cat <<HOOKOUT
 {
   "decision": "block",
-  "reason": "Autoresearch session is active (run ${CURRENT}/${MAX_ITERATIONS:-unlimited}). Spawn the experiment-runner agent to continue the experiment loop. The agent will read autoresearch.md and autoresearch.jsonl to resume with fresh context. Do NOT run experiments directly — always delegate to the experiment-runner agent."
+  "reason": "Autoresearch session is active (run ${CURRENT}/${MAX_DISPLAY}). Spawn the experiment-runner agent to continue the experiment loop. The agent will read autoresearch.md and autoresearch.jsonl to resume with fresh context. If autoresearch.ideas.md exists, check it for prioritized experiment ideas. Do NOT run experiments directly — always delegate to the experiment-runner agent."
 }
 HOOKOUT

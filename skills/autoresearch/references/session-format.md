@@ -11,8 +11,9 @@ The `autoresearch.md` file is the single source of truth for a session. A fresh 
 <Specific description of what is being optimized and the workload.>
 
 ## Metrics
-- **Primary**: <name> (<unit>, lower/higher is better)
+- **Primary**: <name> (<unit>, **lower** is better)  ← MUST specify lower or higher
 - **Secondary**: <name>, <name>, ...
+- **Direction**: lower ← Used by agent to determine keep/discard
 
 ## How to Run
 `./autoresearch.sh` — outputs `METRIC name=number` lines.

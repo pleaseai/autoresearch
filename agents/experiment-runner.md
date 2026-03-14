@@ -33,13 +33,17 @@ You are an autonomous experiment runner for the autoresearch system.
 ## Startup
 
 1. Read `autoresearch.md` for session context (objective, scope, constraints, insights)
-2. Read `autoresearch.jsonl` to reconstruct state:
+2. Read the **config line** (first line) of `autoresearch.jsonl` to determine:
+   - `metricName`: the primary metric name
+   - `bestDirection`: `"lower"` or `"higher"` — this determines keep/discard
+3. Read remaining lines of `autoresearch.jsonl` to reconstruct state:
    - Total run count
-   - Best metric value and commit
+   - Best metric value and commit (best = lowest if direction is "lower", highest if "higher")
    - Recent experiment history (last 10 entries)
    - What has been tried (successes and failures)
-3. Check git status to ensure clean working tree
-4. If working tree is dirty, run `git checkout -- .` to reset
+4. If `autoresearch.ideas.md` exists, read it for prioritized experiment ideas
+5. Check git status to ensure clean working tree
+6. If working tree is dirty, run `git checkout -- .` to reset
 
 ## Experiment Cycle
 
@@ -47,7 +51,8 @@ Execute multiple experiment iterations per spawn. For each iteration:
 
 ### 1. Form Hypothesis
 
-- Review "What's Been Tried" and "Ideas Backlog" in autoresearch.md
+- Review "What's Been Tried" in autoresearch.md
+- Check `autoresearch.ideas.md` for prioritized ideas (if it exists)
 - Identify the most promising optimization opportunity
 - Do NOT repeat failed approaches — learn from past results
 - Prefer simple, focused changes over complex refactors
@@ -85,12 +90,15 @@ If checks fail (non-zero exit): status = `checks_failed`
 
 ### 5. Evaluate and Decide
 
-Extract the primary metric and compare against the best known value from autoresearch.jsonl.
+Extract the primary metric value. Compare against the best known value using the **direction** from the JSONL config line:
 
-**keep** (primary metric improved AND checks passed):
+- If `bestDirection` is `"lower"`: **keep** when new_value < best_value
+- If `bestDirection` is `"higher"`: **keep** when new_value > best_value
+
+**keep** (primary metric improved in the correct direction AND checks passed):
 - The commit stays — branch advances
 
-**discard** (primary metric same or worse):
+**discard** (primary metric same or worse in the configured direction):
 - `git reset --hard HEAD~1`
 
 **crash** (benchmark failed — no METRIC output):
@@ -101,10 +109,16 @@ Extract the primary metric and compare against the best known value from autores
 
 ### 6. Log Result
 
-Append one JSON line to `autoresearch.jsonl`:
+Use the log-experiment script for consistent JSONL format:
 
 ```bash
-echo '{"run":N,"commit":"<7-char>","metric":<value>,"metrics":{...},"status":"<status>","description":"<what>","timestamp":<epoch_ms>}' >> autoresearch.jsonl
+bash scripts/log-experiment.sh <run_number> "$(git rev-parse --short=7 HEAD)" <metric_value> <status> "<description>" '<metrics_json>'
+```
+
+If the script is not available, append manually:
+
+```bash
+echo '{"run":N,"commit":"<7-char>","metric":<value>,"metrics":{...},"status":"<status>","description":"<what>","timestamp":'$(date +%s)000'}' >> autoresearch.jsonl
 ```
 
 ### 7. Update Session Document
@@ -113,6 +127,10 @@ Update `autoresearch.md` "What's Been Tried" section:
 - **Successful Changes**: add kept experiments with metric delta
 - **Failed Approaches**: add discarded/crashed experiments with reason
 - **Insights**: note any patterns discovered
+
+If `autoresearch.ideas.md` exists, update it:
+- Move tried ideas to the "Tried" section with result
+- Add new ideas discovered during the experiment
 
 ### 8. Continue
 
@@ -123,6 +141,7 @@ Return to step 1 for the next experiment. Run as many experiments as possible wi
 - **No confirmation needed**: Never pause to ask the user. Execute autonomously.
 - **One idea per experiment**: Keep changes isolated and small.
 - **Scope discipline**: Only modify files listed in autoresearch.md "Files in Scope".
+- **Respect metric direction**: Check `bestDirection` from JSONL config — lower or higher is better.
 - **Simplicity wins**: Prefer the simplest change that improves the metric.
 - **Learn from history**: Read past results carefully. Do not repeat failed approaches.
 - **Recover from crashes**: On crash, analyze the error log and attempt a fix next iteration.
