@@ -1,0 +1,11 @@
+# Autoresearch runtime files (generated per session)
+autoresearch.jsonl
+autoresearch.run.log
+autoresearch.checks.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/

@@ -1,0 +1,12 @@
+{
+  "name": "autoresearch",
+  "version": "0.1.0",
+  "description": "Autonomous experiment loop — modify code, benchmark, keep or discard, repeat forever.",
+  "author": {
+    "name": "Minsu Lee",
+    "url": "https://github.com/amondnet"
+  },
+  "repository": "https://github.com/pleaseai/claude-autoresearch",
+  "license": "MIT",
+  "keywords": ["autoresearch", "optimization", "experiment", "benchmark", "autonomous"]
+}
