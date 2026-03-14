@@ -1,12 +1,13 @@
 ---
 name: autoresearch
 description: >
-  This skill should be used when the user asks to "run autoresearch",
-  "optimize X in a loop", "autonomous experiment", "benchmark loop",
-  "keep optimizing", "run experiments autonomously", "autoresearch session",
-  or mentions autonomous optimization, iterative benchmarking,
-  experiment loops, or continuous improvement cycles.
-version: 0.1.0
+  Autonomous experiment loop protocol — modify code, benchmark, keep or discard,
+  repeat. Use when the user asks to "run autoresearch", "optimize in a loop",
+  "autonomous experiment", "benchmark loop", "keep optimizing", "run experiments
+  autonomously", or mentions iterative benchmarking, experiment loops, continuous
+  improvement cycles, or autoresearch sessions. Also activates when autoresearch.md
+  or autoresearch.jsonl files are present in the working directory.
+user-invocable: false
 ---
 
 # Autoresearch — Autonomous Experiment Loop
@@ -62,7 +63,7 @@ Status values: `keep`, `discard`, `crash`, `checks_failed`
 
 ## Session Document Template
 
-For the `autoresearch.md` template, see `references/session-format.md`.
+For the `autoresearch.md` template, see [`references/session-format.md`](${CLAUDE_SKILL_DIR}/references/session-format.md).
 
 ## Experiment Loop Protocol
 
@@ -97,7 +98,13 @@ LOOP FOREVER:
 
 ## Parsing Metrics
 
-To extract metrics from benchmark output:
+Extract metrics from benchmark output using the bundled script:
+
+```bash
+bash ${CLAUDE_SKILL_DIR}/../../scripts/parse-metrics.sh autoresearch.run.log
+```
+
+Or inline:
 
 ```bash
 grep "^METRIC " autoresearch.run.log | sed 's/^METRIC //' | while IFS='=' read -r name value; do
@@ -108,4 +115,4 @@ done
 ## Additional Resources
 
 ### Reference Files
-- **`references/session-format.md`** — Complete `autoresearch.md` template with all sections
+- **[`references/session-format.md`](${CLAUDE_SKILL_DIR}/references/session-format.md)** — Complete `autoresearch.md` template with all sections

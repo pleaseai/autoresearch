@@ -1,6 +1,7 @@
 ---
-name: autoresearch-status
+name: status
 description: Display the current autoresearch session status, results summary, and experiment history.
+allowed-tools: Read, Grep, Glob
 ---
 
 # Autoresearch Status
@@ -53,4 +54,4 @@ Display the current status of the autoresearch session.
 | ... | ... | ... | ... | ... |
 ```
 
-5. **If the user wants to resume**, suggest running `/autoresearch` to continue.
+5. **If the user wants to resume**, suggest running `/autoresearch:run` to continue.

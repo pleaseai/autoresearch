@@ -1,6 +1,9 @@
 ---
-name: autoresearch
+name: run
 description: Start or resume an autonomous experiment loop for any optimization target.
+disable-model-invocation: true
+argument-hint: "[optimization target]"
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 ---
 
 # Autoresearch — Autonomous Experiment Loop

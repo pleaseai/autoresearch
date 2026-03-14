@@ -23,7 +23,7 @@ claude --plugin-dir /path/to/autoresearch
 ### Start a session
 
 ```
-/autoresearch
+/autoresearch:run
 ```
 
 Claude will ask what you want to optimize, then create session files and start running experiments autonomously.
@@ -31,7 +31,7 @@ Claude will ask what you want to optimize, then create session files and start r
 ### Check status
 
 ```
-/autoresearch-status
+/autoresearch:status
 ```
 
 View the current session's progress, metrics, and experiment history.
@@ -89,8 +89,8 @@ Status values: `keep`, `discard`, `crash`, `checks_failed`
 
 | Component | Description |
 |-----------|-------------|
-| `/autoresearch` | Start or resume an autonomous experiment loop |
-| `/autoresearch-status` | Display session status and experiment history |
+| `/autoresearch:run` | Start or resume an autonomous experiment loop |
+| `/autoresearch:status` | Display session status and experiment history |
 | `experiment-runner` agent | Autonomous experiment execution agent |
 | `autoresearch` skill | Session format, METRIC protocol, git integration |
 | `parse-metrics.sh` | Parse METRIC lines from benchmark output |
