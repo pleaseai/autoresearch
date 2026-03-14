@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
-# Stop hook: prevents Claude from stopping during an active autoresearch session.
-# If autoresearch is active (flag file exists + session files present),
-# blocks the stop and re-injects the loop prompt.
+# Stop hook: re-spawns experiment-runner agent when autoresearch session is active.
+# pi-autoresearch pattern: each agent spawn gets fresh context.
 set -euo pipefail
+
+INPUT=$(cat)
+
+# CRITICAL: Prevent infinite loop. If stop_hook_active is true,
+# this is a re-entry from a previous stop hook block — allow stop.
+STOP_HOOK_ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false' 2>/dev/null || echo "false")
+if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
+  exit 0
+fi
 
 FLAG_FILE="$CLAUDE_PROJECT_DIR/.autoresearch-active"
 
@@ -13,15 +21,14 @@ fi
 
 # Check if session files exist
 if [ ! -f "$CLAUDE_PROJECT_DIR/autoresearch.md" ]; then
-  # Session file missing, clean up flag and allow stop
   rm -f "$FLAG_FILE"
   exit 0
 fi
 
 # Check max iterations
-MAX_ITERATIONS=$(cat "$FLAG_FILE" 2>/dev/null | head -1)
-if [ -z "$MAX_ITERATIONS" ] || [ "$MAX_ITERATIONS" = "0" ]; then
-  MAX_ITERATIONS=0  # unlimited
+MAX_ITERATIONS=$(head -1 "$FLAG_FILE" 2>/dev/null || echo "0")
+if [ -z "$MAX_ITERATIONS" ]; then
+  MAX_ITERATIONS=0
 fi
 
 # Count current iterations from JSONL
@@ -30,16 +37,16 @@ if [ -f "$CLAUDE_PROJECT_DIR/autoresearch.jsonl" ]; then
   CURRENT=$(wc -l < "$CLAUDE_PROJECT_DIR/autoresearch.jsonl" | tr -d ' ')
 fi
 
-# If max iterations reached, allow stop
-if [ "$MAX_ITERATIONS" -gt 0 ] && [ "$CURRENT" -ge "$MAX_ITERATIONS" ]; then
+# If max iterations reached, allow stop and clean up
+if [ "$MAX_ITERATIONS" -gt 0 ] 2>/dev/null && [ "$CURRENT" -ge "$MAX_ITERATIONS" ] 2>/dev/null; then
   rm -f "$FLAG_FILE"
   exit 0
 fi
 
-# Block stop and re-inject the autoresearch loop prompt
-cat <<'HOOKOUT'
+# Block stop and instruct to spawn a fresh experiment-runner agent
+cat <<HOOKOUT
 {
   "decision": "block",
-  "reason": "Autoresearch session is active. Continue the experiment loop: read autoresearch.md and autoresearch.jsonl to resume from where you left off. Analyze past results, form a new hypothesis, implement a focused change, benchmark, and keep or discard based on the primary metric. Do NOT stop until the session is cancelled with /autoresearch:cancel."
+  "reason": "Autoresearch session is active (run ${CURRENT}/${MAX_ITERATIONS:-unlimited}). Spawn the experiment-runner agent to continue the experiment loop. The agent will read autoresearch.md and autoresearch.jsonl to resume with fresh context. Do NOT run experiments directly — always delegate to the experiment-runner agent."
 }
 HOOKOUT

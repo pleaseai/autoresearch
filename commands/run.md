@@ -2,8 +2,7 @@
 name: run
 description: Start or resume an autonomous experiment loop for any optimization target.
 disable-model-invocation: true
-argument-hint: "[optimization target]"
-allowed-tools: Read, Write, Edit, Bash, Grep, Glob
+argument-hint: "[optimization target] [--max-iterations N]"
 ---
 
 # Autoresearch — Autonomous Experiment Loop
@@ -42,52 +41,37 @@ If no `autoresearch.md` session document exists in the working directory:
 echo "0" > .autoresearch-active
 ```
 
-7. **Start the experiment loop** (see below).
+7. **Spawn the experiment-runner agent** to begin the loop.
 
 ## Resume Phase
 
 If `autoresearch.md` and `autoresearch.jsonl` already exist:
 
-1. **Read** `autoresearch.md` for session context.
-2. **Read** `autoresearch.jsonl` to reconstruct state (best metric, run count, last commit).
-3. **Check git status** to ensure clean working tree.
-4. **Re-activate the loop**: Create `.autoresearch-active` flag file if not present.
-5. **Continue the experiment loop** from where it left off.
+1. **Re-activate the loop**: Create `.autoresearch-active` flag file if not present.
+2. **Spawn the experiment-runner agent** to continue from where it left off.
 
-## Experiment Loop
+The agent reads `autoresearch.md` and `autoresearch.jsonl` to reconstruct state automatically.
+
+## How the Loop Works
 
 ```
-LOOP FOREVER:
-1. Analyze current code and past results to form a hypothesis
-2. Edit files in scope with an experimental change
-3. git add -A && git commit -m "<description>"
-4. Run: bash autoresearch.sh > autoresearch.run.log 2>&1
-5. Parse METRIC lines from output
-6. If no METRIC lines → crash. Read tail of log for error.
-7. Compare primary metric against best known value
-8. If improved:
-   - Status: keep
-   - Update best known value
-   - Append to autoresearch.jsonl
-   - Update "What's Been Tried" in autoresearch.md
-9. If not improved:
-   - Status: discard
-   - Append to autoresearch.jsonl
-   - git reset --hard HEAD~1
-10. If checks script exists and benchmark passed:
-    - Run: bash autoresearch.checks.sh > autoresearch.checks.log 2>&1
-    - If checks fail: revert and log as checks_failed
-11. Log progress summary
-12. Continue to next iteration
+/autoresearch:run
+  → Setup (if needed) + activate flag
+  → Spawn experiment-runner agent
+  → Agent runs N experiments with fresh context
+  → Agent exits (turn budget reached)
+  → Stop hook detects active session
+  → Stop hook instructs: "Spawn experiment-runner again"
+  → New agent spawns with fresh context
+  → Reads autoresearch.md + .jsonl to resume
+  → Repeat until /autoresearch:cancel or --max-iterations reached
 ```
+
+Each agent spawn gets a **fresh context window**, so the loop can run hundreds of iterations without context overflow.
 
 ## Important Rules
 
-- **NEVER stop to ask for confirmation** during the loop — run autonomously until interrupted.
-- **Keep changes small and focused** — one idea per experiment.
-- **Track everything** in `autoresearch.jsonl` — every run, including crashes and discards.
-- **Update `autoresearch.md`** with key insights and tried approaches.
-- If a crash occurs, read the error log and attempt a fix in the next iteration.
-- Aim for the simplest change that improves the metric.
-- A **Stop hook** will automatically re-inject the loop prompt when Claude tries to stop. The loop continues until the user runs `/autoresearch:cancel` or `--max-iterations` is reached.
+- **Delegate to agent**: Do NOT run the experiment loop directly. Always spawn the `experiment-runner` agent.
+- A **Stop hook** automatically triggers re-spawning of the agent when it exits.
+- The loop continues until the user runs `/autoresearch:cancel` or `--max-iterations` is reached.
 - To cancel: run `/autoresearch:cancel` which removes the `.autoresearch-active` flag.

@@ -52,19 +52,31 @@ Stop the experiment loop gracefully. Claude will finish the current iteration an
 
 ## How It Works
 
-1. **Setup** — Define optimization target, primary metric, files in scope, and constraints.
-2. **Branch** — Create `autoresearch/<tag>` git branch for the session.
-3. **Loop** — Autonomous cycle:
-   - Analyze past results and form a hypothesis
-   - Edit code with a focused change
-   - `git commit`
-   - Run benchmark (`autoresearch.sh`)
-   - Parse `METRIC name=value` lines from output
-   - **Keep** if primary metric improved (branch advances)
-   - **Discard** if not improved (`git reset --hard`)
-   - Log result to `autoresearch.jsonl`
-   - Repeat (Stop hook prevents Claude from stopping)
-4. **Cancel** — Run `/autoresearch:cancel` to stop, or use `--max-iterations` as a safety net.
+```
+/autoresearch:run
+  → Setup (ask target, create branch, create session files)
+  → Activate .autoresearch-active flag
+  → Spawn experiment-runner agent (fresh context)
+  → Agent runs experiments autonomously
+  → Agent exits (turn budget reached)
+  → Stop hook detects active session
+  → Stop hook: "Spawn experiment-runner again"
+  → New agent spawns with fresh context
+  → Reads autoresearch.md + .jsonl to resume
+  → Repeat until /autoresearch:cancel or --max-iterations
+```
+
+Each agent spawn gets a **fresh context window** (inspired by [pi-autoresearch](https://github.com/davebcn87/pi-autoresearch)), so the loop can run hundreds of iterations without context overflow. Session state persists through `autoresearch.md` and `autoresearch.jsonl`.
+
+### Experiment Cycle (per agent spawn)
+
+1. Read session state from `autoresearch.md` + `autoresearch.jsonl`
+2. Form hypothesis based on past results
+3. Implement focused code change → `git commit`
+4. Run benchmark (`autoresearch.sh`) → parse `METRIC` lines
+5. **Keep** if metric improved, **Discard** if not → `git reset --hard`
+6. Log result to `autoresearch.jsonl`, update `autoresearch.md`
+7. Repeat within turn budget
 
 ## Session Files
 
@@ -110,9 +122,10 @@ Status values: `keep`, `discard`, `crash`, `checks_failed`
 | `/autoresearch:cancel` | Cancel the active experiment loop |
 | `experiment-runner` agent | Autonomous experiment execution agent |
 | `autoresearch` skill | Session format, METRIC protocol, git integration |
-| Stop hook | Auto-resume loop when Claude tries to stop |
-| SessionStart hook | Detect existing sessions on startup |
+| Stop hook | Re-spawn agent when it exits during active session |
+| SessionStart hook | Detect existing sessions on startup/resume |
 | PreCompact hook | Preserve session state before context compaction |
+| Post-compact hook | Re-inject state after context compaction |
 | `parse-metrics.sh` | Parse METRIC lines from benchmark output |
 
 ## License
