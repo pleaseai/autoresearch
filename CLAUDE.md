@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is a **Claude Code plugin** called `autoresearch` — an autonomous experiment loop that modifies code, benchmarks, keeps improvements, and discards regressions. It follows the Claude Code plugin specification with commands, agents, skills, and hooks.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design and data flow.
+See [.please/INDEX.md](.please/INDEX.md) for workspace navigation and project artifacts.
 
 ## Plugin Structure
 
