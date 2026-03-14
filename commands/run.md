@@ -34,7 +34,15 @@ If no `autoresearch.md` session document exists in the working directory:
 
 5. **Run baseline**: Execute the benchmark, record initial metrics, commit as baseline.
 
-6. **Start the experiment loop** (see below).
+6. **Activate the loop**: Create `.autoresearch-active` flag file.
+   - If `$ARGUMENTS` includes `--max-iterations N`, write `N` to the flag file.
+   - Otherwise write `0` (unlimited).
+
+```bash
+echo "0" > .autoresearch-active
+```
+
+7. **Start the experiment loop** (see below).
 
 ## Resume Phase
 
@@ -43,7 +51,8 @@ If `autoresearch.md` and `autoresearch.jsonl` already exist:
 1. **Read** `autoresearch.md` for session context.
 2. **Read** `autoresearch.jsonl` to reconstruct state (best metric, run count, last commit).
 3. **Check git status** to ensure clean working tree.
-4. **Continue the experiment loop** from where it left off.
+4. **Re-activate the loop**: Create `.autoresearch-active` flag file if not present.
+5. **Continue the experiment loop** from where it left off.
 
 ## Experiment Loop
 
@@ -80,3 +89,5 @@ LOOP FOREVER:
 - **Update `autoresearch.md`** with key insights and tried approaches.
 - If a crash occurs, read the error log and attempt a fix in the next iteration.
 - Aim for the simplest change that improves the metric.
+- A **Stop hook** will automatically re-inject the loop prompt when Claude tries to stop. The loop continues until the user runs `/autoresearch:cancel` or `--max-iterations` is reached.
+- To cancel: run `/autoresearch:cancel` which removes the `.autoresearch-active` flag.

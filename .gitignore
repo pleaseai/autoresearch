@@ -2,6 +2,7 @@
 autoresearch.jsonl
 autoresearch.run.log
 autoresearch.checks.log
+.autoresearch-active
 
 # OS
 .DS_Store

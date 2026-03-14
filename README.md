@@ -26,7 +26,13 @@ claude --plugin-dir /path/to/autoresearch
 /autoresearch:run
 ```
 
-Claude will ask what you want to optimize, then create session files and start running experiments autonomously.
+Claude will ask what you want to optimize, then create session files and start running experiments autonomously. A **Stop hook** keeps the loop running — Claude won't stop until you cancel.
+
+### With max iterations
+
+```
+/autoresearch:run --max-iterations 20
+```
 
 ### Check status
 
@@ -35,6 +41,14 @@ Claude will ask what you want to optimize, then create session files and start r
 ```
 
 View the current session's progress, metrics, and experiment history.
+
+### Cancel the loop
+
+```
+/autoresearch:cancel
+```
+
+Stop the experiment loop gracefully. Claude will finish the current iteration and then stop.
 
 ## How It Works
 
@@ -49,7 +63,8 @@ View the current session's progress, metrics, and experiment history.
    - **Keep** if primary metric improved (branch advances)
    - **Discard** if not improved (`git reset --hard`)
    - Log result to `autoresearch.jsonl`
-   - Repeat forever
+   - Repeat (Stop hook prevents Claude from stopping)
+4. **Cancel** — Run `/autoresearch:cancel` to stop, or use `--max-iterations` as a safety net.
 
 ## Session Files
 
@@ -61,6 +76,7 @@ View the current session's progress, metrics, and experiment history.
 | `autoresearch.jsonl` | Experiment log — one JSON line per run | No |
 | `autoresearch.run.log` | Last benchmark output | No |
 | `autoresearch.checks.log` | Last checks output | No |
+| `.autoresearch-active` | Loop active flag (max iterations) | No |
 
 ## Benchmark Script
 
@@ -91,8 +107,12 @@ Status values: `keep`, `discard`, `crash`, `checks_failed`
 |-----------|-------------|
 | `/autoresearch:run` | Start or resume an autonomous experiment loop |
 | `/autoresearch:status` | Display session status and experiment history |
+| `/autoresearch:cancel` | Cancel the active experiment loop |
 | `experiment-runner` agent | Autonomous experiment execution agent |
 | `autoresearch` skill | Session format, METRIC protocol, git integration |
+| Stop hook | Auto-resume loop when Claude tries to stop |
+| SessionStart hook | Detect existing sessions on startup |
+| PreCompact hook | Preserve session state before context compaction |
 | `parse-metrics.sh` | Parse METRIC lines from benchmark output |
 
 ## License
