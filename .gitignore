@@ -11,5 +11,8 @@ Thumbs.db
 # Claude Code local settings
 .claude/settings.local.json
 
+# please plugin runtime state
+.please/state/
+
 # Node
 node_modules/
