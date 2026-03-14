@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Stop hook: re-spawns experiment-runner agent when autoresearch session is active.
 # pi-autoresearch pattern: each agent spawn gets fresh context.
+# Includes cooldown to prevent rapid re-spawns and API cost spikes.
 set -euo pipefail
 
 INPUT=$(cat)
@@ -13,6 +14,8 @@ if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
 fi
 
 FLAG_FILE="$CLAUDE_PROJECT_DIR/.autoresearch-active"
+COOLDOWN_FILE="$CLAUDE_PROJECT_DIR/.autoresearch-last-spawn"
+COOLDOWN_SECONDS=30  # minimum seconds between agent re-spawns
 
 # If no active flag, allow stop
 if [ ! -f "$FLAG_FILE" ]; then
@@ -21,7 +24,7 @@ fi
 
 # Check if session files exist
 if [ ! -f "$CLAUDE_PROJECT_DIR/autoresearch.md" ]; then
-  rm -f "$FLAG_FILE"
+  rm -f "$FLAG_FILE" "$COOLDOWN_FILE"
   exit 0
 fi
 
@@ -39,9 +42,24 @@ fi
 
 # If max iterations reached, allow stop and clean up
 if [ "$MAX_ITERATIONS" -gt 0 ] 2>/dev/null && [ "$CURRENT" -ge "$MAX_ITERATIONS" ] 2>/dev/null; then
-  rm -f "$FLAG_FILE"
+  rm -f "$FLAG_FILE" "$COOLDOWN_FILE"
   exit 0
 fi
+
+# Cooldown check: prevent rapid re-spawns
+NOW=$(date +%s)
+if [ -f "$COOLDOWN_FILE" ]; then
+  LAST_SPAWN=$(cat "$COOLDOWN_FILE" 2>/dev/null || echo "0")
+  ELAPSED=$((NOW - LAST_SPAWN))
+  if [ "$ELAPSED" -lt "$COOLDOWN_SECONDS" ]; then
+    REMAINING=$((COOLDOWN_SECONDS - ELAPSED))
+    # Allow stop during cooldown — user can /autoresearch:run to resume
+    exit 0
+  fi
+fi
+
+# Record spawn time for cooldown tracking
+echo "$NOW" > "$COOLDOWN_FILE"
 
 # Block stop and instruct to spawn a fresh experiment-runner agent
 cat <<HOOKOUT

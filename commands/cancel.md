@@ -10,10 +10,10 @@ Stop the active autoresearch experiment loop.
 
 ## Instructions
 
-1. Remove the `.autoresearch-active` flag file:
+1. Remove the loop control files:
 
 ```bash
-rm -f .autoresearch-active
+rm -f .autoresearch-active .autoresearch-last-spawn
 ```
 
 2. Report the final status:

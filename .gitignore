@@ -3,6 +3,7 @@ autoresearch.jsonl
 autoresearch.run.log
 autoresearch.checks.log
 .autoresearch-active
+.autoresearch-last-spawn
 
 # OS
 .DS_Store
