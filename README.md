@@ -1,10 +1,23 @@
-# Autoresearch
+# autoresearch — autonomous experiment loop for Claude Code
 
-Autonomous experiment loop plugin for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
+**[Install](#install)** · **[Usage](#usage)** · **[How it works](#how-it-works)**
 
-Modify code, benchmark, keep improvements, discard regressions, repeat forever.
+*Try an idea, measure it, keep what works, discard what doesn't, repeat forever.*
 
-Inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch) and [davebcn87/pi-autoresearch](https://github.com/davebcn87/pi-autoresearch).
+Inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch) and [davebcn87/pi-autoresearch](https://github.com/davebcn87/pi-autoresearch). Works for any optimization target: test speed, bundle size, LLM training, build times, Lighthouse scores.
+
+---
+
+## What's included
+
+| | |
+|---|---|
+| **Commands** | `/autoresearch:run`, `/autoresearch:status`, `/autoresearch:cancel` |
+| **Agent** | `experiment-runner` — autonomous experiment execution |
+| **Skill** | Session protocol, METRIC format, git integration |
+| **Hooks** | Stop (loop continuity), SessionStart, PreCompact, PostCompact |
+
+---
 
 ## Install
 
@@ -12,100 +25,161 @@ Inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch) an
 claude plugin add pleaseai/autoresearch
 ```
 
-Or for local development:
+<details>
+<summary>Local development</summary>
 
 ```bash
 claude --plugin-dir /path/to/autoresearch
 ```
 
+</details>
+
+---
+
 ## Usage
 
-### Start a session
+### 1. Start autoresearch
 
 ```
 /autoresearch:run
 ```
 
-Claude will ask what you want to optimize, then create session files and start running experiments autonomously. A **Stop hook** keeps the loop running — Claude won't stop until you cancel.
-
-### With max iterations
+Claude asks about your goal, command, metric, and files in scope. It then creates a branch, writes `autoresearch.md` and `autoresearch.sh`, runs the baseline, and starts looping immediately.
 
 ```
 /autoresearch:run --max-iterations 20
 ```
 
-### Check status
+Use `--max-iterations` as a safety net.
+
+### 2. The loop
+
+The agent runs autonomously: edit → commit → benchmark → keep or revert → repeat. It never stops unless interrupted.
+
+Every result is appended to `autoresearch.jsonl` — one line per run. This means:
+
+- **Survives restarts** — the agent can resume a session by reading the file
+- **Survives context resets** — `autoresearch.md` captures what's been tried so a fresh agent has full context
+- **Human readable** — open it anytime to see the full history
+- **Branch-aware** — each session runs on `autoresearch/<tag>` branch
+
+### 3. Monitor progress
 
 ```
 /autoresearch:status
 ```
 
-View the current session's progress, metrics, and experiment history.
+Shows run count, kept/discarded/crashed stats, best metric, and recent experiments.
 
-### Cancel the loop
+### 4. Cancel
 
 ```
 /autoresearch:cancel
 ```
 
-Stop the experiment loop gracefully. Claude will finish the current iteration and then stop.
+Stops the loop gracefully. The current iteration finishes, then Claude stops normally.
 
-## How It Works
+---
+
+## Example domains
+
+| Domain | Metric | Command |
+|--------|--------|---------|
+| Test speed | seconds ↓ | `npm test` |
+| Bundle size | KB ↓ | `npm run build && du -sb dist` |
+| LLM training | val_bpb ↓ | `uv run train.py` |
+| Build speed | seconds ↓ | `cargo build --release` |
+| Lighthouse | perf score ↑ | `lighthouse http://localhost:3000 --output=json` |
+| API latency | p99_ms ↓ | `wrk -t4 -c100 -d10s http://localhost:8080/api` |
+
+---
+
+## How it works
+
+The **agent** is the execution unit. The **commands** orchestrate. The **hooks** keep the loop alive. The **skill** provides protocol knowledge.
+
+```
+┌──────────────────────────┐     ┌──────────────────────────┐
+│  Commands + Hooks        │     │  Agent + Skill            │
+│  (infrastructure)        │     │  (execution)              │
+│                          │     │                           │
+│  /autoresearch:run       │────►│  experiment-runner        │
+│  Stop hook (re-spawn)    │     │  reads autoresearch.md    │
+│  SessionStart (detect)   │     │  edits code, benchmarks   │
+│  PreCompact (preserve)   │     │  keeps or discards        │
+│                          │     │  logs to .jsonl           │
+└──────────────────────────┘     └──────────────────────────┘
+```
+
+### Agent re-spawn pattern
+
+Each batch of experiments runs in a **fresh agent context**. When the agent exits (turn budget reached), the Stop hook blocks Claude from stopping and instructs it to spawn a new agent. The new agent reads `autoresearch.md` and `autoresearch.jsonl` to resume exactly where the previous one left off.
+
+This means the loop can run **hundreds of iterations** without context window overflow.
 
 ```
 /autoresearch:run
-  → Setup (ask target, create branch, create session files)
-  → Activate .autoresearch-active flag
   → Spawn experiment-runner agent (fresh context)
-  → Agent runs experiments autonomously
-  → Agent exits (turn budget reached)
-  → Stop hook detects active session
+  → Agent runs N experiments
+  → Agent exits
   → Stop hook: "Spawn experiment-runner again"
-  → New agent spawns with fresh context
-  → Reads autoresearch.md + .jsonl to resume
+  → New agent (fresh context) reads files, continues
   → Repeat until /autoresearch:cancel or --max-iterations
 ```
 
-Each agent spawn gets a **fresh context window** (inspired by [pi-autoresearch](https://github.com/davebcn87/pi-autoresearch)), so the loop can run hundreds of iterations without context overflow. Session state persists through `autoresearch.md` and `autoresearch.jsonl`.
+### Session files
 
-### Experiment Cycle (per agent spawn)
+Two files keep the session alive across restarts and context resets:
 
-1. Read session state from `autoresearch.md` + `autoresearch.jsonl`
-2. Form hypothesis based on past results
-3. Implement focused code change → `git commit`
-4. Run benchmark (`autoresearch.sh`) → parse `METRIC` lines
-5. **Keep** if metric improved, **Discard** if not → `git reset --hard`
-6. Log result to `autoresearch.jsonl`, update `autoresearch.md`
-7. Repeat within turn budget
+| File | Purpose | Git |
+|------|---------|-----|
+| `autoresearch.md` | Living document — objective, what's been tried, dead ends, key wins | Tracked |
+| `autoresearch.sh` | Benchmark script — outputs `METRIC name=value` lines | Tracked |
+| `autoresearch.checks.sh` | Quality gate checks (optional) | Tracked |
+| `autoresearch.jsonl` | Append-only log — metric, status, commit, description per run | Untracked |
+| `.autoresearch-active` | Loop active flag (contains max iterations count) | Untracked |
 
-## Session Files
+A fresh agent with no memory can read these files and continue exactly where the previous session left off.
 
-| File | Purpose | Git Tracked |
-|------|---------|-------------|
-| `autoresearch.md` | Session document — objective, metrics, scope, insights | Yes |
-| `autoresearch.sh` | Benchmark script — outputs `METRIC name=value` lines | Yes |
-| `autoresearch.checks.sh` | Quality gate script (optional) | Yes |
-| `autoresearch.jsonl` | Experiment log — one JSON line per run | No |
-| `autoresearch.run.log` | Last benchmark output | No |
-| `autoresearch.checks.log` | Last checks output | No |
-| `.autoresearch-active` | Loop active flag (max iterations) | No |
+---
 
-## Benchmark Script
+## Benchmark script
 
-The benchmark script must output metrics in this format:
+The benchmark script must output metrics as `METRIC name=value` lines:
 
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
 # Run your benchmark
-echo "METRIC total_ms=1523"
-echo "METRIC compile_ms=420"
-echo "METRIC memory_mb=128.5"
+result=$(npm test -- --reporter=json 2>&1 | jq '.testResults[0].perfStats.runtime')
+echo "METRIC test_ms=$result"
 ```
 
-## JSONL Log Format
+The first metric matching the configured primary metric determines keep/discard. All metrics are recorded.
 
-Each experiment is logged as one JSON line:
+---
+
+## Backpressure checks (optional)
+
+Create `autoresearch.checks.sh` to run correctness checks (tests, types, lint) after every passing benchmark. This ensures optimizations don't break things.
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+npm test --reporter=dot 2>&1 | tail -50
+npx tsc --noEmit 2>&1 | tail -20
+```
+
+- If the file doesn't exist, the loop runs without checks
+- If it exists, it runs automatically after every passing benchmark
+- Check time does **not** affect the primary metric
+- If checks fail, the experiment is logged as `checks_failed` and reverted
+
+---
+
+## JSONL log format
+
+Each experiment is one JSON line:
 
 ```json
 {"run":1,"commit":"abc1234","metric":1523,"metrics":{"total_ms":1523,"compile_ms":420},"status":"keep","description":"baseline","timestamp":1700000000000}
@@ -113,20 +187,23 @@ Each experiment is logged as one JSON line:
 
 Status values: `keep`, `discard`, `crash`, `checks_failed`
 
-## Plugin Components
+---
+
+## Plugin components
 
 | Component | Description |
 |-----------|-------------|
-| `/autoresearch:run` | Start or resume an autonomous experiment loop |
-| `/autoresearch:status` | Display session status and experiment history |
-| `/autoresearch:cancel` | Cancel the active experiment loop |
-| `experiment-runner` agent | Autonomous experiment execution agent |
-| `autoresearch` skill | Session format, METRIC protocol, git integration |
+| `/autoresearch:run` | Start or resume the experiment loop |
+| `/autoresearch:status` | Display session status and history |
+| `/autoresearch:cancel` | Stop the loop gracefully |
+| `experiment-runner` agent | Autonomous experiment execution (fresh context per spawn) |
+| `autoresearch` skill | METRIC protocol, JSONL schema, session document format |
 | Stop hook | Re-spawn agent when it exits during active session |
 | SessionStart hook | Detect existing sessions on startup/resume |
 | PreCompact hook | Preserve session state before context compaction |
-| Post-compact hook | Re-inject state after context compaction |
-| `parse-metrics.sh` | Parse METRIC lines from benchmark output |
+| PostCompact hook | Re-inject state after context compaction |
+
+---
 
 ## License
 
