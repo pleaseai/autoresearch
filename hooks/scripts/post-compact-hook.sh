@@ -8,25 +8,27 @@ if [ ! -f "$CLAUDE_PROJECT_DIR/autoresearch.md" ]; then
   exit 0
 fi
 
-RUN_COUNT=0
-BEST_METRIC=""
-BEST_COMMIT=""
-ACTIVE=""
+# Use shared status computation
+STATUS_JSON=$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/compute-status.sh" 2>/dev/null || echo "{}")
 
-if [ -f "$CLAUDE_PROJECT_DIR/autoresearch.jsonl" ]; then
-  RUN_COUNT=$(wc -l < "$CLAUDE_PROJECT_DIR/autoresearch.jsonl" | tr -d ' ')
+BRANCH=$(echo "$STATUS_JSON" | jq -r '.branch // "unknown"')
+TOTAL=$(echo "$STATUS_JSON" | jq -r '.totalRuns // 0')
+KEPT=$(echo "$STATUS_JSON" | jq -r '.kept // 0')
+DISCARDED=$(echo "$STATUS_JSON" | jq -r '.discarded // 0')
+CRASHED=$(echo "$STATUS_JSON" | jq -r '.crashed // 0')
+BEST=$(echo "$STATUS_JSON" | jq -r '.bestMetric // "none"')
+METRIC_NAME=$(echo "$STATUS_JSON" | jq -r '.metricName // "metric"')
+IMPROVEMENT=$(echo "$STATUS_JSON" | jq -r '.improvementPct // "0"')
+RATE=$(echo "$STATUS_JSON" | jq -r '.experimentsPerHour // "0"')
+MAX=$(echo "$STATUS_JSON" | jq -r '.maxIterations // 0')
+ACTIVE=$(echo "$STATUS_JSON" | jq -r '.active // false')
 
-  BEST_LINE=$(grep '"status":"keep"' "$CLAUDE_PROJECT_DIR/autoresearch.jsonl" 2>/dev/null | tail -1 || true)
-  if [ -n "$BEST_LINE" ]; then
-    BEST_METRIC=$(echo "$BEST_LINE" | grep -o '"metric":[0-9.e+-]*' | head -1 | cut -d: -f2)
-    BEST_COMMIT=$(echo "$BEST_LINE" | grep -o '"commit":"[^"]*"' | head -1 | cut -d'"' -f4)
-  fi
+MAX_DISPLAY="unlimited"
+[ "$MAX" -gt 0 ] 2>/dev/null && MAX_DISPLAY="$MAX"
+
+ACTIVE_MSG=""
+if [ "$ACTIVE" = "true" ]; then
+  ACTIVE_MSG=" Session is ACTIVE — spawn experiment-runner agent to continue."
 fi
 
-if [ -f "$CLAUDE_PROJECT_DIR/.autoresearch-active" ]; then
-  ACTIVE=" Session is ACTIVE — spawn experiment-runner agent to continue."
-fi
-
-BRANCH=$(git -C "$CLAUDE_PROJECT_DIR" branch --show-current 2>/dev/null || echo "unknown")
-
-echo "[AUTORESEARCH] Context was compacted. Branch: ${BRANCH}, Runs: ${RUN_COUNT}, Best: ${BEST_METRIC:-none} (${BEST_COMMIT:-none}).${ACTIVE}"
+echo "[AUTORESEARCH] Context was compacted. Branch: ${BRANCH} | Run ${TOTAL}/${MAX_DISPLAY} (${KEPT} kept, ${DISCARDED} discarded, ${CRASHED} crashed) | Best ${METRIC_NAME}: ${BEST} (${IMPROVEMENT}% from baseline) | Rate: ${RATE}/hr.${ACTIVE_MSG}"

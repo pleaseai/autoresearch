@@ -121,6 +121,14 @@ If the script is not available, append manually:
 echo '{"run":N,"commit":"<7-char>","metric":<value>,"metrics":{...},"status":"<status>","description":"<what>","timestamp":'$(date +%s)000'}' >> autoresearch.jsonl
 ```
 
+### 6b. Status Output
+
+After logging, output a brief inline status line so the user can track progress:
+
+```
+[autoresearch] Run #N: metric_name=VALUE (STATUS) | Best: BEST_VALUE (IMPROVEMENT% from baseline) | KEPT/TOTAL kept
+```
+
 ### 7. Update Session Document
 
 Update `autoresearch.md` "What's Been Tried" section:
