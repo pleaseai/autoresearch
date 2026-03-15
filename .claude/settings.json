@@ -1,7 +1,76 @@
 {
+    "env": {
+    "ENABLE_TOOL_SEARCH": "true",
+    "CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS": "40000",
+    "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "0",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
   "enabledPlugins": {
     "plugin-dev@claude-plugins-official": true,
     "skill-creator@claude-plugins-official": true,
-    "standards@passionfactory": true
+    "ast-grep@pleaseai": true,
+    "bun@passionfactory": true,
+    "claude-code-setup@passionfactory": true,
+    "claude-md-management@pleaseai": true,
+    "context@passionfactory": true,
+    "dev-tools@passionfactory": true,
+    "eslint-lsp@code-intelligence": true,
+    "fetch@pleaseai": true,
+    "gardening@passionfactory": true,
+    "gatekeeper@pleaseai": true,
+    "github@passionfactory": true,
+    "graphql-lsp@code-intelligence": true,
+    "graphql@passionfactory": true,
+    "markitdown@pleaseai": true,
+    "please@passionfactory": true,
+    "ralph-loop@claude-plugins-official": true,
+    "research@passionfactory": true,
+    "review@passionfactory": true,
+    "spec-kit@pleaseai": true,
+    "standards@passionfactory": true,
+    "testing@passionfactory": true,
+    "tidy-first@passionfactory": true,
+    "tsdown@pleaseai": true,
+    "typescript-lsp@code-intelligence": true,
+    "vitest@pleaseai": true,
+    "worktree@passionfactory": true    
+  },
+  "extraKnownMarketplaces": {
+    "passionfactory": {
+      "source": {
+        "source": "github",
+        "repo": "chatbot-pf/engineering-standards"
+      },
+      "autoUpdate": true
+    },
+    "pleaseai": {
+      "source": {
+        "source": "github",
+        "repo": "pleaseai/claude-code-plugins"
+      },
+      "autoUpdate": true
+    },
+    "code-intelligence": {
+      "source": {
+        "source": "github",
+        "repo": "chatbot-pf/code-intelligence"
+      },
+      "autoUpdate": true
+    }
+  },
+  "language": "en",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun install --ignore-scripts",
+             "async": true,
+          }
+        ]
+      }
+    ]
   }
 }

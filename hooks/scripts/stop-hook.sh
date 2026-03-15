@@ -33,10 +33,10 @@ COOLDOWN_SECONDS=$(sed -n '2p' "$FLAG_FILE" 2>/dev/null || echo "30")
 [ -z "$MAX_ITERATIONS" ] && MAX_ITERATIONS=0
 [ -z "$COOLDOWN_SECONDS" ] && COOLDOWN_SECONDS=30
 
-# Count current iterations from JSONL (exclude config lines)
+# Count current iterations from JSONL (skip config line = line 1)
 CURRENT=0
 if [ -f "$CLAUDE_PROJECT_DIR/autoresearch.jsonl" ]; then
-  CURRENT=$(grep -c '"run":' "$CLAUDE_PROJECT_DIR/autoresearch.jsonl" 2>/dev/null || echo "0")
+  CURRENT=$(tail -n +2 "$CLAUDE_PROJECT_DIR/autoresearch.jsonl" 2>/dev/null | wc -l | tr -d ' ')
 fi
 
 # If max iterations reached, allow stop and clean up
@@ -63,10 +63,18 @@ echo "$NOW" > "$COOLDOWN_FILE"
 MAX_DISPLAY="unlimited"
 [ "$MAX_ITERATIONS" -gt 0 ] 2>/dev/null && MAX_DISPLAY="$MAX_ITERATIONS"
 
+# Compute rich status summary
+STATUS_JSON=$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/compute-status.sh" 2>/dev/null || echo "{}")
+TOTAL=$(echo "$STATUS_JSON" | jq -r '.totalRuns // 0')
+KEPT=$(echo "$STATUS_JSON" | jq -r '.kept // 0')
+DISCARDED=$(echo "$STATUS_JSON" | jq -r '.discarded // 0')
+CRASHED=$(echo "$STATUS_JSON" | jq -r '.crashed // 0')
+BEST=$(echo "$STATUS_JSON" | jq -r '.bestMetric // "none"')
+IMPROVEMENT=$(echo "$STATUS_JSON" | jq -r '.improvementPct // "0"')
+METRIC_NAME=$(echo "$STATUS_JSON" | jq -r '.metricName // "metric"')
+RATE=$(echo "$STATUS_JSON" | jq -r '.experimentsPerHour // "0"')
+
 # Block stop and instruct to spawn a fresh experiment-runner agent
-cat <<HOOKOUT
-{
-  "decision": "block",
-  "reason": "Autoresearch session is active (run ${CURRENT}/${MAX_DISPLAY}). Spawn the experiment-runner agent to continue the experiment loop. The agent will read autoresearch.md and autoresearch.jsonl to resume with fresh context. If autoresearch.ideas.md exists, check it for prioritized experiment ideas. Do NOT run experiments directly — always delegate to the experiment-runner agent."
-}
-HOOKOUT
+jq -n \
+  --arg reason "Autoresearch session is active (run ${CURRENT}/${MAX_DISPLAY}). --- Status: ${TOTAL} runs | ${KEPT} kept, ${DISCARDED} discarded, ${CRASHED} crashed | Best ${METRIC_NAME}: ${BEST} (${IMPROVEMENT}% from baseline) | Rate: ${RATE}/hr --- Spawn the experiment-runner agent to continue the experiment loop. The agent will read autoresearch.md and autoresearch.jsonl to resume with fresh context. If autoresearch.ideas.md exists, check it for prioritized experiment ideas. Do NOT run experiments directly — always delegate to the experiment-runner agent." \
+  '{"decision":"block","reason":$reason}'
