@@ -21,7 +21,6 @@ BASELINE_METRIC=null
 BEST_METRIC=null
 IMPROVEMENT_PCT=0
 FIRST_TS=0
-LAST_TS=0
 ELAPSED=0
 RATE=0
 MAX_ITERATIONS=0
@@ -69,15 +68,18 @@ if [ -f "$JSONL" ]; then
       fi
     fi
 
-    # Improvement %
+    # Improvement % (absolute value — always positive when improving)
     if [ "$BASELINE_METRIC" != "null" ] && [ "$BEST_METRIC" != "null" ] && [ "$BASELINE_METRIC" != "0" ]; then
-      IMPROVEMENT_PCT=$(echo "$BEST_METRIC $BASELINE_METRIC" | awk '{printf "%.1f", (($1 - $2) / $2) * 100}')
+      IMPROVEMENT_PCT=$(echo "$BEST_METRIC $BASELINE_METRIC $BEST_DIRECTION" | awk '{
+        raw = (($1 - $2) / $2) * 100
+        if ($3 == "lower") raw = -raw
+        printf "%.1f", raw
+      }')
     fi
 
     # Timestamps
     FIRST_TS=$(echo "$EXPERIMENTS" | head -1 | jq '.timestamp // 0')
-    LAST_TS=$(echo "$EXPERIMENTS" | tail -1 | jq '.timestamp // 0')
-    NOW_MS=$(date +%s)000
+    NOW_MS=$(( $(date +%s) * 1000 ))
     if [ "$FIRST_TS" -gt 0 ] 2>/dev/null; then
       ELAPSED=$(( (NOW_MS - FIRST_TS) / 1000 ))
       if [ "$ELAPSED" -gt 0 ]; then

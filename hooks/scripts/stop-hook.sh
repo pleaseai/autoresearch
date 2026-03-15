@@ -33,10 +33,10 @@ COOLDOWN_SECONDS=$(sed -n '2p' "$FLAG_FILE" 2>/dev/null || echo "30")
 [ -z "$MAX_ITERATIONS" ] && MAX_ITERATIONS=0
 [ -z "$COOLDOWN_SECONDS" ] && COOLDOWN_SECONDS=30
 
-# Count current iterations from JSONL (exclude config lines)
+# Count current iterations from JSONL (skip config line = line 1)
 CURRENT=0
 if [ -f "$CLAUDE_PROJECT_DIR/autoresearch.jsonl" ]; then
-  CURRENT=$(grep -c '"run":' "$CLAUDE_PROJECT_DIR/autoresearch.jsonl" 2>/dev/null || echo "0")
+  CURRENT=$(tail -n +2 "$CLAUDE_PROJECT_DIR/autoresearch.jsonl" 2>/dev/null | wc -l | tr -d ' ')
 fi
 
 # If max iterations reached, allow stop and clean up
