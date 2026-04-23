@@ -1,0 +1,24 @@
+.claude/settings.json
+  7441dbb54c1a0ee4 70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "387bda5bc9574f872c6e01e7a51da4a205915842",
+  "prompts": {
+    "7441dbb54c1a0ee4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abcb99dc-f1a8-4f1e-a9b5-3603f23a14fa",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Minsu Lee",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "messages_url": "https://usegitai.com/cas/b6400d3c7545ab7126e2a09c3c19077f0943ff15ec8cbad2ab7e6619aaac2b9f"
+    }
+  }
+}
